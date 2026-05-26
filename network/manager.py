@@ -15,6 +15,11 @@ class NetworkManager:
         self.mode = mode
         self.is_running = False
         self._provider = None
+        self.on_message = None
+
+    async def _handle_provider_message(self, peer_id: str, packet: dict):
+        if self.on_message:
+            await self.on_message(peer_id, packet)
 
     async def start(self):
         """Initializes the underlying network listener based on mode"""
@@ -33,6 +38,7 @@ class NetworkManager:
             self._provider = BluetoothProvider(identifier="zevy_node")
 
         if self._provider:
+            self._provider.on_message = self._handle_provider_message
             await self._provider.start()
             
         print(f"[Network] Started listening in mode: {self.mode.name}")
@@ -55,3 +61,24 @@ class NetworkManager:
         if not self.is_running:
             raise RuntimeError("Network not running")
         return []
+
+    async def connect_to_peer(self, host: str, port: int) -> str:
+        if not self.is_running or not self._provider:
+            return None
+        if hasattr(self._provider, 'connect_to_peer'):
+            return await self._provider.connect_to_peer(host, port)
+        return None
+
+    async def send_packet(self, peer_id: str, packet_type: str, payload: dict) -> bool:
+        if not self.is_running or not self._provider:
+            return False
+        if hasattr(self._provider, 'send_packet'):
+            return await self._provider.send_packet(peer_id, packet_type, payload)
+        return False
+
+_instance = None
+def get_network_manager() -> NetworkManager:
+    global _instance
+    if _instance is None:
+        _instance = NetworkManager()
+    return _instance

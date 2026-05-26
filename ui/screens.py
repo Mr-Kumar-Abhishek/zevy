@@ -9,7 +9,7 @@ from kivy.graphics import Color, RoundedRectangle
 from kivy.utils import get_color_from_hex
 
 import crypto_rust
-from network.manager import NetworkManager, NetworkMode
+from network.manager import get_network_manager, NetworkMode
 
 class PeerButton(Button):
     pass
@@ -55,7 +55,7 @@ class DiscoveryScreen(Screen):
     
     def __init__(self, **kwargs):
         super(DiscoveryScreen, self).__init__(**kwargs)
-        self.network = NetworkManager()
+        self.network = get_network_manager()
         self.peers = []
         
         # Pre-generate Zero-Knowledge Proof keys!
@@ -80,7 +80,15 @@ class DiscoveryScreen(Screen):
         import main
         self.network.mode = NetworkMode.LOCAL_MDNS_FALLBACK
         asyncio.run_coroutine_threadsafe(self.network.start(), main.network_loop)
-        self.add_peer(f"Local Node: Laptop (mDNS)\n[color=#FF9F0A]ZKP: {self.zkp_pk[:10]}...[/color]")
+        
+        def delayed_add(*args):
+            async def _connect():
+                peer_id = await self.network.connect_to_peer('127.0.0.1', 8888)
+                if peer_id:
+                    Clock.schedule_once(lambda dt: self.add_peer(f"127.0.0.1:8888\n[color=#FF9F0A]ZKP: {self.zkp_pk[:10]}...[/color]"))
+            asyncio.run_coroutine_threadsafe(_connect(), main.network_loop)
+            
+        Clock.schedule_once(delayed_add, 1.0)
         
     def add_peer(self, peer_name):
         self.peers.append(peer_name)
@@ -108,23 +116,54 @@ class ChatScreen(Screen):
     
     def __init__(self, **kwargs):
         super(ChatScreen, self).__init__(**kwargs)
+        self.network = get_network_manager()
         self.he_client = crypto_rust.HEClient()
         self.server_eval_key = self.he_client.get_evaluation_key()
         self.he_server = crypto_rust.HEServer(self.server_eval_key)
         
+    def on_enter(self):
+        # Hook up network listener when entering chat
+        self.network.on_message = self._on_network_message
+        
+    async def _on_network_message(self, peer_id, packet):
+        import main
+        packet_type = packet.get("type")
+        payload = packet.get("payload", {})
+        
+        if packet_type == "CHAT_MESSAGE":
+            msg = payload.get("msg", "")
+            Clock.schedule_once(lambda dt: self.add_chat_bubble(f"[b]Peer:[/b] {msg}", is_me=False))
+            
+        elif packet_type == "HE_COMPUTE_REQ":
+            cipher_hex = payload.get("cipher")
+            # Simulate matching by computing logical AND on the cipher
+            res = self.he_server.compute_and(cipher_hex, cipher_hex)
+            await self.network.send_packet(peer_id, "HE_COMPUTE_RES", {"res": res})
+            
+        elif packet_type == "HE_COMPUTE_RES":
+            res_hex = payload.get("res")
+            dec = self.he_client.decrypt_bool(res_hex)
+            Clock.schedule_once(lambda dt: self.add_chat_bubble(f"[size=12][color=#A0A0A0](HE Result computed by peer: {dec})[/color][/size]", is_me=False))
+
     def send_message(self):
+        import main
         msg = self.ids.message_input_id.text
         if msg:
             self.add_chat_bubble(f"[b]You:[/b] {msg}", is_me=True)
             self.ids.message_input_id.text = ""
             
-            # Simulate homomorphic encryption of message truthiness over network
-            enc = self.he_client.encrypt_bool(True)
-            res = self.he_server.compute_and(enc, enc)
-            dec = self.he_client.decrypt_bool(res)
+            peer_id = self.current_peer.split('\n')[0] # E.g. "127.0.0.1:8888"
             
-            # Simulate received message
-            Clock.schedule_once(lambda dt: self.add_chat_bubble(f"[b]Peer:[/b] Got it!\n[size=12][color=#A0A0A0](HE Check: {dec})[/color][/size]", is_me=False), 1.2)
+            # Send message over socket
+            asyncio.run_coroutine_threadsafe(
+                self.network.send_packet(peer_id, "CHAT_MESSAGE", {"msg": msg}), main.network_loop
+            )
+            
+            # Send HE challenge over socket
+            enc = self.he_client.encrypt_bool(True)
+            asyncio.run_coroutine_threadsafe(
+                self.network.send_packet(peer_id, "HE_COMPUTE_REQ", {"cipher": enc}), main.network_loop
+            )
             
     def add_chat_bubble(self, text, is_me):
         bubble = ChatBubble(text=text, is_me=is_me)
