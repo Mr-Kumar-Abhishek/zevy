@@ -1,0 +1,219 @@
+#:import hex kivy.utils.get_color_from_hex
+
+<WindowManager>:
+    DiscoveryScreen:
+    ChatScreen:
+
+<DiscoveryScreen>:
+    canvas.before:
+        Color:
+            rgba: hex('#121212') # Deep dark mode background
+        Rectangle:
+            pos: self.pos
+            size: self.size
+            
+    BoxLayout:
+        orientation: 'vertical'
+        padding: dp(20)
+        spacing: dp(15)
+        
+        Label:
+            text: 'Zevy Messenger'
+            font_size: '32sp'
+            bold: True
+            color: hex('#FFFFFF')
+            size_hint_y: 0.15
+            halign: 'left'
+            valign: 'middle'
+            text_size: self.size
+            
+        Label:
+            text: 'Zero-Knowledge Secured P2P Network'
+            font_size: '16sp'
+            color: hex('#A0A0A0')
+            size_hint_y: 0.05
+            halign: 'left'
+            valign: 'top'
+            text_size: self.size
+            
+        BoxLayout:
+            orientation: 'horizontal'
+            size_hint_y: 0.12
+            spacing: dp(15)
+            
+            Button:
+                text: 'BLE Scan'
+                background_normal: ''
+                background_color: 0,0,0,0
+                color: hex('#0A84FF')
+                bold: True
+                on_release: root.start_bluetooth_discovery()
+                canvas.before:
+                    Color:
+                        rgba: hex('#0A84FF') if self.state == 'down' else hex('#2C2C2E')
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [dp(12)]
+                
+            Button:
+                text: 'Wi-Fi Direct'
+                background_normal: ''
+                background_color: 0,0,0,0
+                color: hex('#30D158')
+                bold: True
+                on_release: root.start_wifi_direct_discovery()
+                canvas.before:
+                    Color:
+                        rgba: hex('#30D158') if self.state == 'down' else hex('#2C2C2E')
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [dp(12)]
+                
+            Button:
+                text: 'Local Node'
+                background_normal: ''
+                background_color: 0,0,0,0
+                color: hex('#FF9F0A')
+                bold: True
+                on_release: root.start_mdns_discovery()
+                canvas.before:
+                    Color:
+                        rgba: hex('#FF9F0A') if self.state == 'down' else hex('#2C2C2E')
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [dp(12)]
+                
+        Label:
+            text: 'Nearby Nodes:'
+            font_size: '18sp'
+            bold: True
+            color: hex('#FFFFFF')
+            size_hint_y: 0.05
+            halign: 'left'
+            valign: 'middle'
+            text_size: self.size
+            
+        ScrollView:
+            size_hint_y: 0.63
+            canvas.before:
+                Color:
+                    rgba: hex('#1C1C1E')
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [dp(15)]
+            GridLayout:
+                id: peer_list
+                cols: 1
+                spacing: dp(10)
+                padding: dp(10)
+                size_hint_y: None
+                height: self.minimum_height
+
+<PeerButton@Button>:
+    background_normal: ''
+    background_color: 0, 0, 0, 0
+    color: hex('#FFFFFF')
+    font_size: '16sp'
+    size_hint_y: None
+    height: dp(60)
+    canvas.before:
+        Color:
+            rgba: hex('#3A3A3C') if self.state == 'down' else hex('#2C2C2E')
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [dp(10)]
+
+<ChatScreen>:
+    message_input: message_input_id
+    chat_log: chat_log_id
+    
+    canvas.before:
+        Color:
+            rgba: hex('#000000') # OLED Black
+        Rectangle:
+            pos: self.pos
+            size: self.size
+            
+    BoxLayout:
+        orientation: 'vertical'
+        padding: dp(10)
+        spacing: dp(10)
+        
+        BoxLayout:
+            orientation: 'horizontal'
+            size_hint_y: 0.1
+            canvas.before:
+                Color:
+                    rgba: hex('#1C1C1E')
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [dp(15)]
+            padding: dp(10)
+            
+            Button:
+                text: '< Back'
+                size_hint_x: 0.2
+                background_normal: ''
+                background_color: 0, 0, 0, 0
+                color: hex('#0A84FF')
+                bold: True
+                on_release: root.go_back()
+                
+            Label:
+                text: root.current_peer
+                size_hint_x: 0.8
+                font_size: '18sp'
+                bold: True
+                color: hex('#FFFFFF')
+                halign: 'center'
+                valign: 'middle'
+                text_size: self.size
+                
+        ScrollView:
+            size_hint_y: 0.8
+            BoxLayout:
+                id: chat_log_id
+                orientation: 'vertical'
+                size_hint_y: None
+                height: self.minimum_height
+                spacing: dp(10)
+                padding: dp(10)
+            
+        BoxLayout:
+            orientation: 'horizontal'
+            size_hint_y: None
+            height: dp(50)
+            spacing: dp(10)
+            
+            TextInput:
+                id: message_input_id
+                multiline: False
+                size_hint_x: 0.8
+                background_color: hex('#1C1C1E')
+                foreground_color: hex('#FFFFFF')
+                cursor_color: hex('#0A84FF')
+                font_size: '16sp'
+                padding: [dp(15), dp(15)]
+                on_text_validate: root.send_message()
+                
+            Button:
+                text: 'Send'
+                size_hint_x: 0.2
+                background_normal: ''
+                background_color: 0,0,0,0
+                color: hex('#FFFFFF')
+                bold: True
+                on_release: root.send_message()
+                canvas.before:
+                    Color:
+                        rgba: hex('#007AFF') if self.state == 'down' else hex('#0A84FF')
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [dp(15)]
