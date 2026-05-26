@@ -68,13 +68,29 @@ class DiscoveryScreen(Screen):
         import main
         self.network.mode = NetworkMode.BLUETOOTH
         asyncio.run_coroutine_threadsafe(self.network.start(), main.network_loop)
-        self.add_peer(f"BT Peer: Android-123 (Simulated)\n[color=#0A84FF]ZKP: {self.zkp_pk[:10]}...[/color]")
+        
+        def delayed_add(*args):
+            async def _connect():
+                # On desktop, this will hit the fallback on port 8890
+                peer_id = await self.network.connect_to_peer('127.0.0.1', 8890)
+                if peer_id:
+                    Clock.schedule_once(lambda dt: self.add_peer(f"{peer_id} (BLE Fallback)\n[color=#0A84FF]ZKP: {self.zkp_pk[:10]}...[/color]"))
+            asyncio.run_coroutine_threadsafe(_connect(), main.network_loop)
+        Clock.schedule_once(delayed_add, 1.0)
         
     def start_wifi_direct_discovery(self):
         import main
         self.network.mode = NetworkMode.WIFI_DIRECT
         asyncio.run_coroutine_threadsafe(self.network.start(), main.network_loop)
-        self.add_peer(f"Wi-Fi Peer: Pixel-7 (Simulated)\n[color=#30D158]ZKP: {self.zkp_pk[:10]}...[/color]")
+        
+        def delayed_add(*args):
+            async def _connect():
+                # On desktop, this will hit the fallback on port 8889
+                peer_id = await self.network.connect_to_peer('127.0.0.1', 8889)
+                if peer_id:
+                    Clock.schedule_once(lambda dt: self.add_peer(f"{peer_id} (WiFi Fallback)\n[color=#30D158]ZKP: {self.zkp_pk[:10]}...[/color]"))
+            asyncio.run_coroutine_threadsafe(_connect(), main.network_loop)
+        Clock.schedule_once(delayed_add, 1.0)
         
     def start_mdns_discovery(self):
         import main
