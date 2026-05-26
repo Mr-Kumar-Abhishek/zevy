@@ -1,6 +1,14 @@
+"""Zevy Network Protocol — Newline-delimited JSON packet serialization.
+
+All peer-to-peer communication in Zevy uses this module to serialize and
+deserialize packets. Each packet is a single JSON object terminated by a
+newline character, enabling simple stream parsing over persistent TCP sockets.
+"""
+
 import json
 
 class PacketType:
+    """Constants for the packet types exchanged between peers."""
     HANDSHAKE = "HANDSHAKE"
     CHAT_MESSAGE = "CHAT_MESSAGE"
     HE_COMPUTE_REQ = "HE_COMPUTE_REQ"

@@ -1,0 +1,10 @@
+# Core
+kivy>=2.3
+zeroconf>=0.131.0
+
+# Testing
+pytest>=9.0
+pytest-asyncio>=1.3
+
+# Rust build tool (for crypto_rust)
+maturin>=1.0

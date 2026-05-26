@@ -1,3 +1,10 @@
+"""Zevy Messenger — Entry point.
+
+Launches a background asyncio event loop for non-blocking network I/O,
+then starts the Kivy application with the ScreenManager containing
+the DiscoveryScreen and ChatScreen.
+"""
+
 import os
 import sys
 import threading

@@ -1,62 +1,154 @@
 # Software Design Document (SDD)
-## Secure P2P Messenger
+## Zevy — Secure P2P Messenger
 
 ### 1. Introduction
-This Software Design Document (SDD) details the architectural choices, system components, and data flows for the secure P2P messenger application built in Kivy.
+
+This document details the architectural design, system components, and data flows
+for Zevy Messenger — a privacy-first, offline-capable peer-to-peer messaging
+application with cryptographic identity verification and private computation.
 
 ### 2. System Architecture
 
 #### 2.1 High-Level Architecture
-The application follows a modular, multi-threaded architecture to ensure the UI remains responsive during heavy cryptographic processing and blocking network I/O operations.
 
-1. **Presentation Layer (UI):** Built entirely in Kivy, handling user inputs, displaying messages, and managing navigation.
-2. **Business Logic Layer:** Manages application state, orchestrates cryptographic handshakes, and handles message queuing.
-3. **Cryptography Module:** Encapsulates the complex math required for Zero Knowledge Proofs and Homomorphic Encryption.
-4. **Network Access Layer:** Interfaces with native OS APIs for hardware radios (Bluetooth, Wi-Fi).
+Zevy follows a modular, multi-threaded architecture:
+
+| Layer                    | Technology           | Responsibility                                     |
+|--------------------------|----------------------|----------------------------------------------------|
+| **Presentation (UI)**    | Kivy + KV Language   | Screens, navigation, dark-mode rendering           |
+| **Network Abstraction**  | Python asyncio       | Routing packets through Wi-Fi Direct / BLE / TCP   |
+| **Crypto Engine**        | Rust (PyO3 → Python) | Zero-Knowledge Proofs (Groth16) + Homomorphic Encryption (TFHE) |
+
+A background `asyncio` event loop runs in a daemon thread (`main.network_loop`)
+so that network I/O never blocks the Kivy UI thread.
 
 #### 2.2 Component Design
 
-**A. Kivy Presentation Layer**
-- `MainScreen`: Displays active chats and nearby discovered peers.
-- `ChatScreen`: The messaging interface for a specific peer.
-- `NetworkSettingsScreen`: Toggles between Bluetooth and Wi-Fi Direct modes.
+##### A. Kivy Presentation Layer (`ui/`)
 
-**B. Cryptography Module**
-- `ZKP_Engine`: Implements non-interactive zero-knowledge proofs (e.g., using `zksk` or a C++ compiled backend). Used strictly for peer authentication (e.g., proving knowledge of a shared secret without transmitting it).
-- `HE_Engine`: Handles Homomorphic Encryption logic. Due to performance constraints on mobile, this will likely use a lightweight scheme (e.g., BFV or CKKS via a compiled wrapper like `TenSEAL`). Used for Private Set Intersection (PSI) to discover mutual contacts securely.
+| Component         | File              | Purpose                                          |
+|-------------------|-------------------|--------------------------------------------------|
+| `DiscoveryScreen` | `screens.py`      | Peer scanning, ZKP key generation, mode selection |
+| `ChatScreen`      | `screens.py`      | Message send/receive, HE challenge/response       |
+| `ChatBubble`      | `screens.py`      | Glassmorphism-styled message bubble widget        |
+| `PeerButton`      | `screens.py`      | Styled button for discovered peers                |
+| Layout            | `components.kv`   | Kivy language markup (OLED-black dark mode)       |
 
-**C. Network Access Layer (Android via Pyjnius)**
-- `BluetoothManager`:
-  - Uses `android.bluetooth.BluetoothAdapter` and `BluetoothSocket`.
-  - Runs a background thread listening via `BluetoothServerSocket`.
-- `WiFiDirectManager`:
-  - Uses `android.net.wifi.p2p.WifiP2pManager`.
-  - Implements a `BroadcastReceiver` via `pyjnius` to handle Wi-Fi state changes and peer discovery intents.
-  - Manages standard Java `Socket` connections over the negotiated P2P group owner IP address.
+##### B. Network Abstraction Layer (`network/`)
+
+| Component              | File               | Purpose                                                    |
+|------------------------|--------------------|------------------------------------------------------------|
+| `NetworkManager`       | `manager.py`       | Singleton that routes all packets through the active provider |
+| `NetworkMode`          | `manager.py`       | Enum: `WIFI_DIRECT`, `BLUETOOTH`, `LOCAL_MDNS_FALLBACK`    |
+| `MDNSFallbackProvider` | `mdns_fallback.py` | Persistent TCP server with async reader loops               |
+| `WiFiDirectProvider`   | `wifi_direct.py`   | Android `WifiP2pManager` via pyjnius (TCP fallback on desktop) |
+| `BluetoothProvider`    | `bluetooth.py`     | Android `BluetoothAdapter` via pyjnius (TCP fallback on desktop) |
+| `PacketType`           | `protocol.py`      | Constants and serializers for the JSON packet protocol      |
+
+##### C. Rust Crypto Engine (`crypto_rust/`)
+
+| Symbol               | Type      | Cryptographic Primitive                               |
+|----------------------|-----------|-------------------------------------------------------|
+| `generate_zkp_keys`  | Function  | Groth16 trusted setup on BN254 → `(pk_hex, vk_hex)`  |
+| `generate_proof`     | Function  | zk-SNARK proof that `a × b = c` without revealing `a`, `b` |
+| `verify_proof`       | Function  | Verifies a Groth16 proof against the public input     |
+| `HEClient`           | Class     | Client-side TFHE boolean key generation, encrypt, decrypt |
+| `HEServer`           | Class     | Server-side evaluation (blind `AND` on ciphertexts)   |
 
 ### 3. Data Flow & Protocols
 
-#### 3.1 Peer Discovery & Connection Flow
-1. User enables Discovery (Bluetooth or Wi-Fi Direct).
-2. `NetworkAccessLayer` activates native OS discovery.
-3. OS returns a list of MAC addresses/Device Names.
-4. User selects a peer to connect.
-5. Sockets are bound, and a continuous byte-stream connection is established.
+#### 3.1 Peer Discovery & Connection
 
-#### 3.2 Secure Handshake Flow (ZKP)
-1. Device A and Device B establish a raw socket.
-2. Device A generates a Zero Knowledge Proof to prove its identity (e.g., proving it holds the private key corresponding to a known public identity).
-3. Device B verifies the proof mathematically without learning Device A's private key.
-4. Device B performs the same proof generation for Device A.
-5. Only upon mutual verification does the messaging interface unlock.
+```
+User clicks "Local Node"
+  │
+  ▼
+NetworkManager.start(LOCAL_MDNS_FALLBACK)
+  │
+  ├─► MDNSFallbackProvider.start()  →  asyncio TCP server on port 8888
+  │
+  ▼
+NetworkManager.connect_to_peer("127.0.0.1", 8888)
+  │
+  ├─► asyncio.open_connection()  →  persistent reader task spawned
+  │
+  ▼
+Peer appears in DiscoveryScreen with ZKP public key fingerprint
+```
 
-#### 3.3 Private Contact Discovery (HE)
-1. Device A encrypts its contact list using its HE public key.
-2. Device A sends the homomorphically encrypted list to Device B.
-3. Device B evaluates a matching function on the encrypted list against its own plaintext contact list.
-4. Device B sends the encrypted result back to Device A.
-5. Device A decrypts the result to see the intersection, while Device B learns nothing about A's contacts.
+#### 3.2 Secure Handshake (Zero-Knowledge Proof)
 
-### 4. Challenges & Mitigations
-- **UI Blocking:** Network sockets are blocking. Mitigation: All Pyjnius socket operations and cryptography must reside in Python `threading.Thread` or Kivy `Clock` asynchronous callbacks.
-- **C++ Compilation:** HE and ZKP libraries are computationally heavy and usually written in C++. Mitigation: Heavy reliance on Buildozer recipes and Android NDK cross-compilation.
+1. On app launch, `DiscoveryScreen.__init__` calls `crypto_rust.generate_zkp_keys()`
+   which runs a **Groth16 trusted setup** on the BN254 curve.
+2. The resulting proving key (`pk`) and verifying key (`vk`) are stored.
+3. A truncated hex fingerprint of the public key is displayed next to each
+   discovered peer to visually confirm identity.
+4. (Future) A `HANDSHAKE` packet will exchange the full `vk` and a proof so
+   each peer can call `crypto_rust.verify_proof()` before unlocking chat.
+
+#### 3.3 Chat Message Flow
+
+```
+User types "Hello" and clicks Send
+  │
+  ├─► CHAT_MESSAGE packet  ──► TCP socket  ──► Peer displays message
+  │
+  ├─► HEClient.encrypt_bool(True)
+  │     └─► HE_COMPUTE_REQ packet  ──► TCP socket  ──► Peer
+  │                                                      │
+  │                                   HEServer.compute_and(ct, ct)
+  │                                                      │
+  │     HE_COMPUTE_RES packet  ◄── TCP socket  ◄─────────┘
+  │
+  └─► HEClient.decrypt_bool(result)  →  displayed in UI
+```
+
+The peer **never** sees the plaintext boolean — computation happens entirely
+on the encrypted ciphertext.
+
+#### 3.4 Packet Protocol
+
+All packets are **newline-delimited JSON** (`\n`-terminated):
+
+```json
+{"type": "CHAT_MESSAGE", "payload": {"msg": "Hello!"}}
+{"type": "HE_COMPUTE_REQ", "payload": {"cipher": "<bytes>"}}
+{"type": "HE_COMPUTE_RES", "payload": {"res": "<bytes>"}}
+```
+
+### 4. Threading Model
+
+```
+┌─────────────────────────┐     ┌─────────────────────────┐
+│   Main Thread (Kivy)    │     │  Daemon Thread (asyncio) │
+│                         │     │                          │
+│  UI rendering           │     │  network_loop.run_forever│
+│  Button callbacks       │────►│  TCP read/write tasks    │
+│  Clock.schedule_once    │◄────│  on_message callbacks    │
+│                         │     │                          │
+└─────────────────────────┘     └─────────────────────────┘
+```
+
+- `asyncio.run_coroutine_threadsafe()` bridges Kivy → asyncio.
+- `kivy.clock.Clock.schedule_once()` bridges asyncio → Kivy (thread-safe UI updates).
+
+### 5. Platform Abstraction
+
+| Platform  | Wi-Fi Direct           | Bluetooth              | mDNS/TCP           |
+|-----------|------------------------|------------------------|---------------------|
+| Android   | `WifiP2pManager` (JNI) | `BluetoothAdapter` (JNI) | `zeroconf` + TCP |
+| Desktop   | TCP fallback (port 8889) | TCP fallback (port 8890) | `zeroconf` + TCP (port 8888) |
+
+Desktop fallbacks use the **same** `MDNSFallbackProvider` on different ports,
+ensuring that all cryptographic operations (ZKP, HE) execute identically
+regardless of the transport layer.
+
+### 6. Security Considerations
+
+- **No Central Server**: All data stays on the local network. There is no
+  cloud relay, no metadata logging, no phone-home.
+- **Forward Secrecy**: ZKP keys are regenerated on every app launch.
+- **Blind Computation**: The HE server never accesses plaintext. It operates
+  exclusively on encrypted ciphertexts.
+- **Transport Layer**: TCP sockets are currently unencrypted (plaintext JSON).
+  A future sprint should add TLS or Noise Protocol for wire encryption.

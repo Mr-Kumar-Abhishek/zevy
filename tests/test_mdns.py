@@ -20,9 +20,9 @@ async def test_tcp_peer_exchange():
     await provider_a.start()
     await provider_b.start()
     
-    # Provider A connects to Provider B
-    success = await provider_a.connect_to_peer("127.0.0.1", 8889)
-    assert success == True
+    # Provider A connects to Provider B — returns peer_id string on success
+    peer_id = await provider_a.connect_to_peer("127.0.0.1", 8889)
+    assert peer_id == "127.0.0.1:8889"
     
     await provider_a.stop()
     await provider_b.stop()

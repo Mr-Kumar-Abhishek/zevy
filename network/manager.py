@@ -1,7 +1,16 @@
+"""Zevy Network Manager — Abstract routing layer for P2P connectivity.
+
+Provides a singleton ``NetworkManager`` that transparently routes packets
+through whichever physical transport is active (Wi-Fi Direct, Bluetooth,
+or mDNS/TCP fallback). Upper layers (UI, crypto) never need to know
+which transport is in use.
+"""
+
 import asyncio
 from enum import Enum
 
 class NetworkMode(Enum):
+    """Supported networking transports."""
     WIFI_DIRECT = 1
     BLUETOOTH = 2
     LOCAL_MDNS_FALLBACK = 3

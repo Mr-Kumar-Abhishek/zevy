@@ -1,9 +1,27 @@
+"""mDNS/TCP Fallback Provider — Local network peer discovery and messaging.
+
+This provider implements the primary desktop networking backend for Zevy.
+It runs an async TCP server (using ``asyncio.start_server``) that keeps
+persistent connections to peers and exchanges newline-delimited JSON packets.
+
+On Android, the Wi-Fi Direct and Bluetooth providers handle the physical
+transport; this module serves as the universal fallback for platforms that
+lack native P2P hardware APIs.
+"""
+
 import asyncio
 import socket
 from zeroconf import Zeroconf, ServiceInfo
 from network.protocol import parse_packet, create_packet
 
 class MDNSFallbackProvider:
+    """Persistent TCP server with async message loops for local P2P.
+
+    Args:
+        identifier: A human-readable name for this node.
+        port: The TCP port to listen on (default 8888).
+    """
+
     def __init__(self, identifier: str, port: int = 8888):
         self.identifier = identifier
         self.port = port
