@@ -301,4 +301,4 @@ This project was developed using **Agile methodology with Test-Driven Developmen
 
 ## License
 
-This project is currently unlicensed. Add a `LICENSE` file to specify terms.
+This project is licensed under the BSD 3-Clause License. See the [LICENSE.txt](LICENSE.txt) file for details.
