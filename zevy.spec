@@ -1,6 +1,10 @@
 # -*- mode: python ; coding: utf-8 -*-
+import sys
 
-from kivy_deps import sdl2, glew
+deps_bins = []
+if sys.platform == 'win32':
+    from kivy_deps import sdl2, glew
+    deps_bins = [Tree(p) for p in (sdl2.dep_bins + glew.dep_bins)]
 
 block_cipher = None
 
@@ -54,7 +58,7 @@ coll = COLLECT(
     a.binaries,
     a.zipfiles,
     a.datas,
-    *[Tree(p) for p in (sdl2.dep_bins + glew.dep_bins)],
+    *deps_bins,
     strip=False,
     upx=True,
     upx_exclude=[],
