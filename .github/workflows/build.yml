@@ -60,10 +60,11 @@ jobs:
 
     - name: Build PyInstaller Executable
       shell: bash
-      env:
-        KIVY_GL_BACKEND: angle_sdl2
-        KIVY_NO_CONSOLELOG: 1
       run: |
+        if [ "$RUNNER_OS" == "Windows" ]; then
+          export KIVY_GL_BACKEND=angle_sdl2
+          export KIVY_NO_CONSOLELOG=1
+        fi
         pyinstaller zevy.spec --noconfirm
 
     - name: Upload Artifact
