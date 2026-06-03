@@ -36,7 +36,7 @@ jobs:
     - name: Install System Dependencies (macOS)
       if: runner.os == 'macOS'
       run: |
-        brew install pkg-config sdl2 sdl2_image sdl2_ttf sdl2_mixer gstreamer
+        brew install pkg-config
 
     - name: Install Windows Specific Dependencies
       if: runner.os == 'Windows'
@@ -60,6 +60,9 @@ jobs:
 
     - name: Build PyInstaller Executable
       shell: bash
+      env:
+        KIVY_GL_BACKEND: angle_sdl2
+        KIVY_NO_CONSOLELOG: 1
       run: |
         pyinstaller zevy.spec --noconfirm
 
