@@ -33,6 +33,13 @@ if sys.platform == 'android':
         WifiP2pManager = autoclass('android.net.wifi.p2p.WifiP2pManager')
         Context = autoclass('android.content.Context')
         PythonActivity = autoclass('org.kivy.android.PythonActivity')
+        # Java networking classes for socket communication
+        ServerSocket = autoclass('java.net.ServerSocket')
+        Socket = autoclass('java.net.Socket')
+        BufferedReader = autoclass('java.io.BufferedReader')
+        InputStreamReader = autoclass('java.io.InputStreamReader')
+        PrintWriter = autoclass('java.io.PrintWriter')
+        OutputStreamWriter = autoclass('java.io.OutputStreamWriter')
     except Exception as e:
         print(f"[WiFiDirect] pyjnius error: {e}")
         WifiP2pManager = None
