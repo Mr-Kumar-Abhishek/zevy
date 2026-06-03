@@ -98,6 +98,11 @@ jobs:
         pip install maturin
         rustup target add aarch64-linux-android
         cd crypto_rust
+        
+        echo "int dummy() { return 0; }" > dummy.c
+        $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang -shared dummy.c -o libpython3.11.so
+        export RUSTFLAGS="-L $(pwd) -C link-arg=-Wl,--unresolved-symbols=ignore-all"
+        
         export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang
         export CC_aarch64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang
         export CXX_aarch64_linux_android=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang++
