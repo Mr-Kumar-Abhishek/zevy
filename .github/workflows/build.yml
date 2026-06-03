@@ -96,12 +96,12 @@ jobs:
 
     - name: Build Rust Crypto Backend for Android
       run: |
-        pip install "maturin[zig]"
+        cargo install cargo-ndk
         rustup target add aarch64-linux-android
         cd crypto_rust
-        maturin build --release --target aarch64-linux-android --zig -i python
-        unzip target/wheels/*.whl -d extracted
-        cp extracted/crypto_rust/crypto_rust.abi3.so ../crypto_rust.so
+        export PYO3_CROSS_PYTHON_VERSION=3.11
+        cargo ndk -t arm64-v8a -p 24 build --release
+        cp target/aarch64-linux-android/release/libcrypto_rust.so ../crypto_rust.so
         cd ..
 
     - name: Build with Buildozer
