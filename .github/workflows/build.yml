@@ -30,7 +30,7 @@ jobs:
       if: runner.os == 'Linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev pkg-config libgl1-mesa-dev libgles2-mesa-dev python3-setuptools libgstreamer1.0-dev git-core gstreamer1.0-plugins-{bad,base,good,ugly} gstreamer1.0-{omx,alsa} python3-dev libmtdev-dev xclip xsel libjpeg-dev
+        sudo apt-get install -y build-essential libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev pkg-config libgl1-mesa-dev libgles2-mesa-dev python3-setuptools libgstreamer1.0-dev git-core gstreamer1.0-plugins-{bad,base,good,ugly} gstreamer1.0-alsa python3-dev libmtdev-dev xclip xsel libjpeg-dev
 
     - name: Install System Dependencies (macOS)
       if: runner.os == 'macOS'
@@ -67,3 +67,22 @@ jobs:
       with:
         name: zevy-${{ runner.os }}
         path: dist/zevy/
+
+  build-android:
+    name: Build for Android
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build with Buildozer
+      uses: ArtemSBulgakov/buildozer-action@v1
+      id: buildozer
+      with:
+        command: buildozer android debug
+        buildozer_version: master
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: zevy-Android-APK
+        path: ${{ steps.buildozer.outputs.filename }}
