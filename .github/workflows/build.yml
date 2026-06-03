@@ -94,6 +94,16 @@ jobs:
         python -m pip install --upgrade pip setuptools wheel cython
         pip install buildozer
 
+    - name: Build Rust Crypto Backend for Android
+      run: |
+        pip install "maturin[zig]"
+        rustup target add aarch64-linux-android
+        cd crypto_rust
+        maturin build --release --target aarch64-linux-android --zig -i python
+        unzip target/wheels/*.whl -d extracted
+        cp extracted/crypto_rust/crypto_rust.abi3.so ../crypto_rust.so
+        cd ..
+
     - name: Build with Buildozer
       run: |
         buildozer android debug
