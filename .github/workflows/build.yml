@@ -98,8 +98,12 @@ jobs:
       run: |
         cargo install cargo-ndk
         rustup target add aarch64-linux-android
+        mkdir -p crypto_rust/cross_lib
+        echo "void Py_Initialize(void) {}" > crypto_rust/cross_lib/dummy.c
+        $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang -shared -o crypto_rust/cross_lib/libpython3.11.so crypto_rust/cross_lib/dummy.c
         cd crypto_rust
         export PYO3_CROSS_PYTHON_VERSION=3.11
+        export PYO3_CROSS_LIB_DIR=$(pwd)/cross_lib
         cargo ndk -t arm64-v8a -P 24 build --release
         cp target/aarch64-linux-android/release/libcrypto_rust.so ../crypto_rust.so
         cd ..
