@@ -3,6 +3,8 @@ name: Build Executables
 on:
   push:
     branches: [ "master" ]
+    tags:
+      - 'v*'
   pull_request:
     branches: [ "master" ]
   workflow_dispatch:
@@ -67,11 +69,22 @@ jobs:
         fi
         pyinstaller zevy.spec --noconfirm
 
+    - name: Archive build
+      shell: bash
+      run: |
+        cd dist
+        if [ "$RUNNER_OS" == "Windows" ]; then
+          7z a ../zevy-${{ runner.os }}.zip zevy
+        else
+          zip -r ../zevy-${{ runner.os }}.zip zevy
+        fi
+        cd ..
+
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: zevy-${{ runner.os }}
-        path: dist/zevy/
+        name: zevy-${{ runner.os }}-archive
+        path: zevy-${{ runner.os }}.zip
 
   build-android:
     name: Build for Android
@@ -120,3 +133,40 @@ jobs:
       with:
         name: zevy-Android-APK
         path: bin/*.apk
+
+  release:
+    name: Create Release
+    needs: [build, build-android]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Download Windows Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: zevy-Windows-archive
+        path: release-artifacts
+    - name: Download macOS Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: zevy-macOS-archive
+        path: release-artifacts
+    - name: Download Linux Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: zevy-Linux-archive
+        path: release-artifacts
+    - name: Download Android Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: zevy-Android-APK
+        path: release-artifacts
+        
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: release-artifacts/*
+        generate_release_notes: true
